@@ -36,12 +36,14 @@ app.config['UPLOAD_PATH'] = "imgData"
 # setup a mysql connection
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'master'
-app.config['MYSQL_HOST'] = '192.168.56.1'
+app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_DB'] = 'schema1'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 mysql = MySQL(app)
 
-
+@app.route('/', methods=['GET', 'POST'])
+def basic():
+	return "this is working"
 @app.route('/delete', methods=['GET', 'POST'])
 def delete():
 	msg = False
