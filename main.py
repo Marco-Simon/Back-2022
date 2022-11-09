@@ -19,13 +19,13 @@ from imutils.perspective import four_point_transform
 from werkzeug.utils import secure_filename
 import pytesseract 
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract'
-
+from flask_cors import CORS
 
  
 HOUR_AND_HALF = 5400
 # Initializing flask app
 app = Flask(__name__)
-
+CORS(app)
 app.secret_key = 'your secret key'
 
 app.config['MAX_CONTENT_LENGTH'] = 2048 * 2048
