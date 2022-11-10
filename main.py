@@ -1,11 +1,8 @@
 # Import flask and datetime module for showing date and time
-import base64
-import io
 import os
 import re
 import json
 import imghdr
-import sys
 import cv2 as cv
 import numpy as np
 from cmath import acos
@@ -14,19 +11,21 @@ from flask_mysqldb import MySQL
 from msilib.schema import Component
 from matplotlib import pyplot as plt
 from datetime import timedelta, datetime 
-from flask import Flask,session, Blueprint, request, render_template, redirect, url_for, abort
+from flask import Flask, session, Blueprint, request
+from flask_session import Session
 from imutils.perspective import four_point_transform
 from werkzeug.utils import secure_filename
 import pytesseract 
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract'
 from flask_cors import CORS
 
- 
+USERNAME =''
+LASTNAME =''
 HOUR_AND_HALF = 5400
 # Initializing flask app
 app = Flask(__name__)
-CORS(app)
 app.secret_key = 'your secret key'
+CORS(app)
 
 app.config['MAX_CONTENT_LENGTH'] = 2048 * 2048
 app.config['UPLOAD_EXTENSIONS'] = ['.jpeg', '.jpg', '.png', '.gif']
@@ -48,8 +47,8 @@ def basic():
 def delete():
 	msg = False
 	if request.method == 'POST' and 'dateC' in request.get_json():
-		user = session.get('username')      # gets the users first name
-		last_name = session.get('last_name')    # gets the last name .
+		user = request.get_json().get('USERNAME')      # gets the users first name
+		last_name = request.get_json().get('LASTNAME')    # gets the last name .
 		time = request.get_json().get('timeC')         # gets the time that was submitted.
 		machine = request.get_json().get('machineC')    # gets the machine that was chosen.
 		date = request.get_json().get('dateC')      # gets the date that was chosen.
@@ -85,6 +84,7 @@ def getMachines():
 	allMachines = cursor.fetchall()
 	print(allMachines)
 	msg = allMachines
+	print('-- getMachines -- ')
 	mysql.connection.commit()
 	return {"Message": msg}
 
@@ -92,13 +92,11 @@ def getMachines():
 @app.route('/isAvailable', methods=['GET', 'POST'])
 def isAvailable():
 	if request.method == 'POST' and 'type' in request.get_json():
-		user = session.get('username')      # gets the users first name
-		last_name = session.get('last_name')    # gets the last name .
 		time = request.get_json().get('time')         # gets the time that was submitted.
 		machine = request.get_json().get('machineI')    # gets the machine that was chosen.
 		date = request.get_json().get('date')      # gets the date that was chosen.
 		type = request.get_json().get('type')    # gets the type of machine that was chosen.
-
+		print('-- isAvailable -- ')
 		# verify which type was selected
 		if type == 'wash':
 			table = "timewash"
@@ -112,9 +110,10 @@ def isAvailable():
 def getTable():
 	msg = ''
 	if request.method == 'POST':
-		user = session.get('username')      # gets the users first name
-		last_name = session.get('last_name')    # gets the last name .
+		user = request.get_json().get('USERNAME')      # gets the users first name
+		last_name = request.get_json().get('LASTNAME')    # gets the last name .
 		type = request.get_json().get('type')    # gets the type of machine that was chosen.
+		print('user = ', user, ' last name = ', last_name)
 		if type == 'wash':
 			table = "timewash"
 		else:
@@ -144,7 +143,7 @@ def index():
 	# if the user chooses a time
 	# changed 'appt' to 'time', for convinience
 	if request.method == 'POST' and 'time' in request.get_json():
-		user = session.get('username')      # gets the users first name
+		user = request.get_json().get('USERNAME')      # gets the users first name
 		print("user type: ", type(user) )
 
 		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
@@ -156,7 +155,7 @@ def index():
 		# for value in us:
 		#     last_name = value[1]
 
-		last_name = session.get('last_name')  
+		last_name = request.get_json().get('LASTNAME')  
 		time = request.get_json().get('time')         # gets the time that was submitted
 		machine = request.get_json().get('machine')    # gets the machine that was chosen
 		date = request.get_json().get('date')      # gets the date that was chosen
@@ -303,13 +302,14 @@ def index():
 @app.route('/getContact', methods=['GET', 'POST'])
 def getContact():
 	msg = ''
-	user = session.get('username')      # gets the users first name
-	last_name = session.get('last_name')    # gets the last name .
-	cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-	cursor.execute('SELECT Name, LastName, Email, PhoneNumber FROM accounts WHERE ID > 1 AND Name !=%s AND LastName !=%s', (user, last_name, ))
-	mysql.connection.commit()
-	account = cursor.fetchall()
-	msg = account
+	if request.method == 'POST' :
+		user = request.get_json().get('USERNAME')      # gets the users first name
+		last_name = request.get_json().get('LASTNAME')    # gets the last name .
+		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+		cursor.execute('SELECT Name, LastName, Email, PhoneNumber FROM accounts WHERE ID > 1 AND Name !=%s AND LastName !=%s', (USERNAME, LASTNAME, ))
+		mysql.connection.commit()
+		account = cursor.fetchall()
+		msg = account
 	return {'Message' : msg}
 ####################  Register  ##################################
 @app.route('/register', methods=['GET', 'POST'])
@@ -340,15 +340,15 @@ def register():
 			msg = 'Invalid Name!'
 		elif len(last_name) <= 2 :
 			msg = 'Invalid Name!'
-		elif len(phone_number) != 10:
-			msg = 'Invalid phone number format'
+		elif len(phone_number) < 8:
+			msg = 'Invalid phone number'
 		elif len(password1) <= 4:
 			msg = 'Invalid password!'
 		elif password1 != password2:
 			msg = 'Please confirm passwords!'
 		else:
-			cursor.execute('INSERT INTO accounts VALUES (NULL, % s, % s, % s, % s, % s)',
-						   (username, last_name, email, phone_number, password1))
+			cursor.execute('INSERT INTO accounts VALUES (NULL, % s, % s, % s, % s, % s, %s)',
+						   (username, last_name, email, phone_number, password1, ''))
 			mysql.connection.commit()
 			msg = True
 			return { 'Message' : msg}
@@ -361,11 +361,12 @@ def register():
 def login():
 	msg = False
 	msg2 = False
+	msg3 = False
 	if request.method == 'POST' :
 		username = request.get_json().get('username')
 		password = request.get_json().get('password')
-		print(type(username))
-		print(type(password))
+		print(username)
+		print(password)
 		cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 		cursor.execute('SELECT * FROM accounts WHERE Name = % s AND Pasword = % s', (username, password))
 		# cursor.execute('SELECT * FROM accounts WHERE Name = \'Mordechai\' ;')
@@ -379,6 +380,7 @@ def login():
 			session['username'] = account['Name']
 			session['last_name'] = account['LastName']
 			msg = True
+			msg3 = account['LastName']
 			print("--- in if statement ---")
 			login.user = account['Name']
 
@@ -390,14 +392,14 @@ def login():
 			# if session['username'] == 'shmuel' and email.get("email") == 'shmueladler@hotmail.com' or session['username'] == 'Mordechai' and email.get("email") == 'palmdr433@gmail.com':
 			#     return { 'Message' : msg}
 
-			return { 'Message' : msg, 'Message2' : msg2}
+			return { 'Message' : msg, 'Message2' : msg2, 'Message3' : msg3}
 
 		else:
 			msg = False
 	else:
 		if "username" in session:
-			return { 'Message' : 'hello', 'Message2' : msg2}
-	return { 'Message' : msg, 'Message2' : msg2}
+			return { 'Message' : msg, 'Message2' : msg2, 'Message3' : msg3}
+	return { 'Message' : msg, 'Message2' : msg2, 'Message3' : msg3}
 
 
 # Route for seeing a data
