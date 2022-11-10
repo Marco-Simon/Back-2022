@@ -413,7 +413,7 @@ def get_time():
 	account = cursor.fetchall()
 	print(account)
 	return account[0]
-@app.route('/logout')
+@app.route('/logout', methods=['GET', 'POST'])
 def logout():
 	session.pop('logged_in', None)
 	session.pop('id', None)
